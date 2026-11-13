@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NULL ALIBI: NUB Confidential — Prototype</title>
+<style>
+:root{--bg:#131110;--panel:#1f1c17;--panel2:#26221b;--green:#7dffa8;--paper:#f4ecd8;--ink:#222;--red:#ff5a5a;--mut:#a89f8d}
+*{box-sizing:border-box}body{margin:0;background:radial-gradient(900px 300px at 80% -5%,#241f16 0%,var(--bg) 60%);color:var(--paper);font-family:Consolas,Menlo,monospace}
+header{background:#0c0b09;padding:16px;border-bottom:1px solid #2e2a22;position:sticky;top:0;z-index:5}
+header h1{margin:0;font-size:22px;letter-spacing:1px}header h1 small{color:var(--green)}header small.sub{opacity:.7}
+main{max-width:1120px;margin:0 auto;padding:12px;display:grid;gap:14px}
+@media(min-width:900px){main{grid-template-columns:300px 1fr 350px}}
+.card{background:linear-gradient(180deg,var(--panel),var(--panel2));border:1px solid #38322a;border-radius:14px;padding:14px;box-shadow:0 4px 18px rgba(0,0,0,.35)}
+.card h3{margin:0 0 8px;color:var(--green);letter-spacing:1px;font-size:14px;text-transform:uppercase}
+button{background:var(--green);color:#111;border:0;border-radius:10px;padding:10px 14px;font-family:inherit;font-weight:800;box-shadow:0 2px 10px rgba(125,255,168,.25)}
+button:active{transform:scale(.97)}
+button.ghost{background:transparent;color:var(--green);border:1.5px solid var(--green);box-shadow:none}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0}
+.chips button{background:#2c2a24;color:var(--green);border:1px solid #4a4438;font-weight:400;padding:7px 10px}
+textarea{width:100%;min-height:96px;background:#0c0b09;color:var(--green);border:1px solid #4a4438;border-radius:10px;padding:10px;font-family:inherit;font-size:14px}
+#board{position:relative;background:radial-gradient(circle at 30% 20%,#2b251b,#201c15);border-radius:12px;min-height:230px;overflow:hidden;border:1px dashed #4a4033}
+.pin{position:absolute;background:var(--paper);color:var(--ink);border-radius:10px;padding:8px;font-size:12px;width:135px;font-family:system-ui;box-shadow:0 2px 8px rgba(0,0,0,.4)}
+.string{position:absolute;height:2px;background:var(--red);transform-origin:left center;opacity:.9;box-shadow:0 0 6px var(--red)}
+.tl{border-left:2px solid #555;margin:8px 0 0 6px;padding-left:10px;font-size:13px}
+.tl div{margin:6px 0}.locked{opacity:.35}
+.suspect{display:flex;gap:10px;align-items:center;background:#2a2620;border:1px solid #3a342a;border-radius:12px;padding:8px;margin:6px 0;font-family:system-ui}
+.suspect .face{width:42px;height:42px;border-radius:50%;background:#4a4438;color:var(--green);display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:800}
+.note{font-size:12px;color:var(--mut);font-family:system-ui}
+#accuse{position:fixed;inset:0;background:rgba(0,0,0,.92);display:none;align-items:center;justify-content:center;z-index:30;text-align:center;padding:20px}
+#accuse.open{display:flex}
+.type{overflow:hidden;white-space:pre-wrap;color:var(--green)}
+.threebox{background:#0c0f0d;border:1px solid #333;border-radius:12px;padding:8px;margin-top:8px}
+.tabs{display:flex;gap:8px;padding:10px 12px;max-width:1120px;margin:0 auto}
+.tabs button{flex:1}
+#out{border:1px solid #3a342a}
+#audit div{padding:2px 0}
+</style>
+</head>
+<body>
+<header><h1>NULL ALIBI <small>NUB Confidential — prototype (static)</small></h1><small>One save, playable mobile + web. Chip-SQL on phone, keyboard terminal on desktop.</small></header>
+<div class="tabs"><button id="bCase">Case 01: Playable</button><button id="bBuild" class="ghost">Teacher builder</button><button id="bAcc" class="ghost">Accusation Mode</button></div>
+<main>
+<section class="card"><h3>Dossier</h3><div style="font-family:system-ui;font-size:14px"><b>Case 01 — The Missing Exhibit</b><br>NUB Research Lab. A capstone exhibit vanished 21:40. Three suspects, one access log, zero alibis.<br><br>Victim table: <code>exhibits</code> • People: <code>students</code> • Trail: <code>access_logs</code></div>
+<div class="tl" id="timeline"><div>✔ Briefing unlocked</div><div id="t1" class="locked">○ List all exhibits</div><div id="t2" class="locked">○ Filter Lab exhibits</div><div id="t3" class="locked">○ JOIN the night log</div></div>
+<div class="note" style="margin-top:8px">Cases 02–03 stubbed for scope. QR handoff: <code id="saveCode">NUB-0000</code> <button class="ghost" id="qrBtn" style="padding:4px 8px">New code</button></div>
+<details style="margin-top:8px;font-family:system-ui;font-size:13px"><summary style="cursor:pointer;color:var(--green)">Schema + table previews</summary><div id="schemaBox" class="note" style="margin-top:6px"></div><div class="chips" id="prevRow"></div></details></section>
+<section><div class="card"><h3>Evidence wall</h3><div id="board"><div class="pin" id="p0" style="left:10px;top:10px">📌 Exhibit<br>Capstone rig<br>Last seen Lab</div></div><div class="note">3D evidence room below — drag to orbit, click a desk to inspect. Textures are primitives; campus block stays boxes-only.</div><div class="threebox"><canvas id="wall3d" width="400" height="170" style="width:100%;touch-action:none"></canvas><div id="roomInfo" class="note">Room: 3 sealed desks. Solve missions to unseal.</div></div></div>
+<div class="card" style="margin-top:12px"><h3>Suspects</h3><div id="susps"><div class="note">Solve missions to unlock profiles.</div></div></div></section>
+<section class="card"><h3>SQL console</h3><div class="note">M1: <code>SELECT * FROM exhibits</code> • M2: add <code>WHERE location = 'Lab'</code> • M3: <code>JOIN access_logs</code></div><div class="chips" id="chipRow"></div><textarea id="q" placeholder="SELECT * FROM exhibits WHERE …"></textarea><div style="display:flex;gap:8px;margin-top:8px"><button id="run" style="flex:1">RUN (Ctrl+Enter)</button><button id="hint" class="ghost">Hint</button><button id="clr" class="ghost">Clear</button></div><div id="out" class="note" style="margin-top:8px;min-height:60px;background:#0c0b09;border-radius:8px;padding:8px"></div>
+<div style="display:flex;gap:8px;align-items:center;margin-top:8px;font-family:system-ui;font-size:13px"><span>Corruption</span><div style="flex:1;background:#0c0b09;border:1px solid #444;border-radius:8px;height:12px"><div id="corr" style="height:100%;width:0%;background:#ff5a5a;border-radius:8px"></div></div><b id="corrV">0%</b><button class="ghost" id="restore" style="padding:5px 9px">Restore backup</button></div>
+<label class="note" style="display:block;margin-top:6px"><input type="checkbox" id="confirmWipe"> I have a backup (required to attempt DELETE/DROP/UPDATE)</label>
+<div id="audit" class="note" style="margin-top:8px;background:#0c0b09;border-radius:8px;padding:8px;max-height:90px;overflow:auto">Audit log: clean.</div>
+<div class="note">Simulated terminal — no real DB, no network, no filesystem. Destructive attempts are contained + logged for awareness. Post-defense: swap validator for <code>sql.js</code> vendored.</div></section>
+</main>
+<section class="card" id="builder" style="display:none;max-width:1100px;margin:0 auto 12px"><h3>Teacher case-builder (web login stub)</h3><div class="note">Stub: <code>nub / 1234</code>. Add a table + expected query. Stored in-memory for prototype.</div><div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px"><input id="bt" placeholder="table name" style="flex:1;padding:9px;border-radius:8px;border:1px solid #444;background:#0c0b09;color:#fff"><input id="bq" placeholder="expected SQL fragment" style="flex:2;padding:9px;border-radius:8px;border:1px solid #444;background:#0c0b09;color:#fff"><button id="badd">Add</button></div><div id="blist" class="note"></div></section>
+<div id="accuse"><div><h1 id="verdict" class="type"></h1><div><button id="closeAcc" class="ghost">Back to desk</button></div></div></div>
+<script src="assets/three.min.js"></script>
+<script src="engine.js"></script>
+<script>
+let solved=[false,false,false];
+const SUSP=[["R","Rain — lab aide","Seen 21:10, claims library"],["W","Will — exhibitor","Prints at 21:35"],["J","Jhade — guard on duty","Log gap 21:30-50"]];
+const chips=["SELECT","*","FROM","exhibits","students","access_logs","WHERE","location = 'Lab'","JOIN","ON",";"];
+const cr=document.getElementById('chipRow');
+chips.forEach(c=>{const b=document.createElement('button');b.textContent=c;b.onclick=()=>{document.getElementById('q').value+=c+' '};cr.appendChild(b)});
+function norm(s){return s.toUpperCase().replace(/\s+/g,' ').trim()}
+let corrupt=0;const auditTrail=[];let wrong=0;
+function logAudit(tag,msg){const t=new Date().toLocaleTimeString();auditTrail.push([t,tag,msg]);const a=document.getElementById('audit');a.innerHTML=auditTrail.slice(-6).map(e=>`<div>[${e[0]}] <b>${e[1]}</b> — ${e[2]}</div>`).join('')}
+function bump(n,msg){corrupt=Math.min(100,corrupt+n);document.getElementById('corr').style.width=corrupt+'%';document.getElementById('corrV').textContent=corrupt+'%';document.getElementById('out').textContent=msg;if(corrupt>=100){document.getElementById('out').textContent='🔒 Evidence locker sealed at 100% corruption. Press Restore backup, then re-run M1 to recover.';logAudit('LOCK','locker sealed — restore required')}}
+function dangerous(q){
+if(/\bDROP\s+TABLE\b/.test(q))return['DROP',!document.getElementById('confirmWipe').checked?'Contained: DROP TABLE would delete evidence. Lesson: least-privilege + backups. Tick "I have a backup" to simulate with containment.':'Simulated DROP contained. Backup held. Lesson logged: least-privilege + backups.'];
+if(/\bDELETE\s+FROM\b/.test(q)&&!/WHERE/.test(q))return['DELETE','Contained: DELETE without WHERE wipes the table. Lesson: always require WHERE + backup.'];
+if(/\bDELETE\s+FROM\b/.test(q))return['DELETE',!document.getElementById('confirmWipe').checked?'Contained: DELETE needs confirm gate. Tick backup box first. Lesson: confirm + audit.':'Simulated DELETE contained (WHERE present, backup held). Lesson logged.'];
+if(/\bUPDATE\b.*SET/.test(q))return['TAMPER',!document.getElementById('confirmWipe').checked?'Contained: UPDATE suspects = obstruction. Tick backup box to simulate. Lesson: audit trails catch edits.':'Simulated tamper contained. Audit log records you. Lesson logged.'];
+if(/('|%27)\s*OR\s*('|\w+\s*=)|UNION\s+SELECT|;\s*--/.test(q))return['INJECTION','Classic injection pattern sanitized here. Lesson: parameterized queries. No data leaked (simulated).'];
+if(/FORMAT|SHUTDOWN|RM\s+-RF|FORMAT\s+C:/.test(q))return['OS','Nice try — this terminal has no OS. Lesson: sandboxing works.'];
+return null}
+function run(){
+const raw=document.getElementById('q').value,q=norm(raw),o=document.getElementById('out');
+const d=dangerous(q);
+if(d){logAudit(d[0],raw.slice(0,60));bump(20,'⚠ '+d[1]+' (Corruption +20%)');return}
+let r;try{r=window.NA_ENGINE.run(raw)}catch(e){r={ok:false,error:String(e)}}
+if(!r.ok){wrong++;o.innerHTML='✘ '+r.error+'<br><span class="note">Hint: '+hint()+'</span>';return}
+renderGrid(r);
+if(r.mission==="M1"&&!solved[0]){unlock(0,r.count+' exhibits returned — rig, poster, drone, journal. Real rows above.')}
+else if(r.mission==="M2"&&solved[0]&&!solved[1]){unlock(1,r.count+' Lab exhibits — rig + drone. Filtered live.')}
+else if(r.mission==="M3"&&solved[1]&&!solved[2]){unlock(2,'Night log JOIN — badge W at 21:38, door forced 21:40. Joined '+r.count+' rows.')}
+else if(solved[2]){o.innerHTML+='<br>Already solved — go accuse.'}
+else{o.innerHTML+='<br><span class="note">Valid query, '+r.count+' rows — but not the mission. Hint: '+hint()+'</span>'}}
+function renderGrid(r){
+const o=document.getElementById('out');
+if(!r.count){o.innerHTML='✔ Ran clean — 0 rows. Loosen the WHERE.';return}
+let h='<div style="overflow:auto"><table style="border-collapse:collapse;font-size:12px"><tr>'+r.cols.map(c=>'<th style="border:1px solid #4a4438;padding:4px 8px;color:var(--green)">'+c+'</th>').join('')+'</tr>';
+r.rows.slice(0,12).forEach(row=>{h+='<tr>'+row.map(v=>'<td style="border:1px solid #333;padding:4px 8px">'+v+'</td>').join('')+'</tr>'});
+h+='</table></div><div class="note">'+r.count+' row(s). Missions unlock on the right result set, not the right string.</div>';
+o.innerHTML=h}
+// schema browser + previews (final-look workstation dressing)
+(function(){try{
+const s=window.NA_ENGINE.schema(),box=document.getElementById('schemaBox');
+box.innerHTML=Object.keys(s).map(t=>'<div><code>'+t+'</code> ('+s[t].join(', ')+')</div>').join('');
+const pr=document.getElementById('prevRow');
+Object.keys(s).forEach(t=>{const b=document.createElement('button');b.textContent=t;b.onclick=()=>{document.getElementById('q').value='SELECT * FROM '+t;run()};pr.appendChild(b)});
+}catch(e){}})();
+function hint(){if(!solved[0])return"Try: SELECT * FROM exhibits";if(!solved[1])return"Add: WHERE location = 'Lab'";return"Try: SELECT * FROM exhibits JOIN access_logs ON …"}
+function unlock(i,msg){
+solved[i]=true;document.getElementById('out').textContent='✔ '+msg;
+if(window.NA_ROOM_UNSEAL)try{window.NA_ROOM_UNSEAL(i)}catch(e){}
+document.getElementById('t'+(i+1)).classList.remove('locked');document.getElementById('t'+(i+1)).textContent='✔ '+document.getElementById('t'+(i+1)).textContent.slice(2);
+const sw=document.getElementById('susps');if(i===0)sw.innerHTML='';
+const d=document.createElement('div');d.className='suspect';d.innerHTML=`<div class="face">${SUSP[i][0]}</div><div><b>${SUSP[i][1]}</b><br><span class="note">${SUSP[i][2]}</span></div>`;sw.appendChild(d);
+const b=document.getElementById('board');const p=document.createElement('div');p.className='pin';p.style.left=(160+i*60)+'px';p.style.top=(60+i*30)+'px';p.textContent='🔗 '+SUSP[i][1];b.appendChild(p);
+const s=document.createElement('div');s.className='string';s.style.left='70px';s.style.top='40px';s.style.width=(120+i*50)+'px';s.style.transform=`rotate(${15+i*10}deg)`;b.appendChild(s);
+if(i===2)document.getElementById('bAcc').style.borderColor='#7dffa8'}
+document.getElementById('run').onclick=run;
+document.getElementById('hint').onclick=()=>document.getElementById('out').textContent='Hint: '+hint();
+document.getElementById('clr').onclick=()=>document.getElementById('q').value='';
+document.getElementById('q').addEventListener('keydown',e=>{if(e.ctrlKey&&e.key==='Enter')run()});
+document.getElementById('qrBtn').onclick=()=>document.getElementById('saveCode').textContent='NUB-'+Math.floor(1000+Math.random()*9000);
+document.getElementById('bBuild').onclick=()=>{const b=document.getElementById('builder');b.style.display=b.style.display==='none'?'block':'none'};
+document.getElementById('bCase').onclick=()=>window.scrollTo(0,0);
+document.getElementById('bAcc').onclick=()=>{
+if(!solved[2])return alert('Solve 3 missions first');
+document.getElementById('accuse').classList.add('open');
+// Verdict scoring: S = 0.30E + 0.25Q + 0.20R + 0.15T + 0.10C (SYSTEMFLOWS §17)
+const E=Math.round(solved.filter(Boolean).length/3*100);
+const Q=Math.max(40,100-wrong*5);
+const R=solved.every(Boolean)?100:40;
+const T=solved.every(Boolean)?100:Math.round(solved.filter(Boolean).length/3*100);
+const C=100; // prototype has one canonical culprit (Will, badge 21:38)
+const S=Math.round(0.30*E+0.25*Q+0.20*R+0.15*T+0.10*C);
+const v=document.getElementById('verdict');v.textContent='';
+const txt='> ACCUSATION: WILL — badge 21:38.\n> Query holds. Case 01 CLOSED.\n>\n> SCORE  E:'+E+' Q:'+Q+' R:'+R+' T:'+T+' C:'+C+'  =>  S='+S+'   (misses:'+wrong+', DROP-tampering hits corruption instead of Q)';
+let k=0;const t=setInterval(()=>{v.textContent=txt.slice(0,++k);if(k>=txt.length)clearInterval(t)},24)};
+document.getElementById('closeAcc').onclick=()=>document.getElementById('accuse').classList.remove('open');
+document.getElementById('badd').onclick=()=>{const t=document.getElementById('bt').value,q=document.getElementById('bq').value;if(!t)return;document.getElementById('blist').innerHTML+=`<div>• ${t} → expects ${q}</div>`};
+document.getElementById('restore').onclick=()=>{corrupt=0;document.getElementById('corr').style.width='0%';document.getElementById('corrV').textContent='0%';logAudit('RESTORE','backup snapshot reloaded (3-2-1 rule demo)');document.getElementById('out').textContent='✔ Backup restored. Re-run M1 to continue.'};
+// 3D evidence room — primitives sandbox (global THREE r128, file:// safe).
+// Desks unseal as missions solve; click a desk to inspect. No outside assets.
+(function(){
+const cv=document.getElementById('wall3d');
+function tag(txt,bg){const c=document.createElement('canvas');c.width=256;c.height=96;
+ const x=c.getContext('2d');x.fillStyle=bg||'#f4ecd8';x.fillRect(0,0,256,96);
+ x.fillStyle='#1c1a16';x.font='bold 44px monospace';x.textAlign='center';x.fillText(txt,128,62);return c}
+if(!window.THREE){cv.outerHTML='<div class="note">3D off — 2D wall above still fully playable.</div>';return}
+const renderer=new THREE.WebGLRenderer({canvas:cv,antialias:true});
+const scene=new THREE.Scene();scene.background=new THREE.Color(0x0c0f0d);
+const cam=new THREE.PerspectiveCamera(55,2,0.1,100);cam.position.set(0,3.4,6.4);cam.lookAt(0,0.8,0);
+scene.add(new THREE.AmbientLight(0xfff2dd,0.85));
+const lamp=new THREE.DirectionalLight(0xffffff,0.9);lamp.position.set(3,6,4);scene.add(lamp);
+const room=new THREE.Group();scene.add(room);
+const floor=new THREE.Mesh(new THREE.PlaneGeometry(14,10),new THREE.MeshStandardMaterial({color:0x1a1712}));
+floor.rotation.x=-Math.PI/2;room.add(floor);
+const board=new THREE.Mesh(new THREE.PlaneGeometry(3.4,2),new THREE.MeshStandardMaterial({color:0x2b251b}));
+board.position.set(0,2.1,-2.4);room.add(board);
+const NAMES=[["R","Rain"], ["W","Will"], ["J","Jhade"]];
+const desks=[],labels=[];
+NAMES.forEach((n,i)=>{
+ const x=(i-1)*2.6;
+ const d=new THREE.Mesh(new THREE.BoxGeometry(1.2,0.9,0.9),new THREE.MeshStandardMaterial({color:0x4a4438}));
+ d.position.set(x,0.45,0.8);d.userData={i,name:n[1]};room.add(d);desks.push(d);
+ const sp=new THREE.Sprite(new THREE.SpriteMaterial({map:new THREE.CanvasTexture(tag(n[0])),transparent:true}));
+ sp.scale.set(0.9,0.34,1);sp.position.set(x,1.75,0.8);room.add(sp);labels.push(sp);
+});
+const BIOS=["Rain — lab aide. Seen 21:10, claims library.","Will — exhibitor. Prints at 21:35, badge 21:38.","Jhade — guard. Log gap 21:30–50."];
+const stringMat=new THREE.LineBasicMaterial({color:0xff5a5a});
+const strings=[];
+function unseal(i){
+ const d=desks[i];d.material.color.set(i===1?0x7d5a2a:0x3f6b4a);
+ const g=new THREE.BufferGeometry().setFromPoints(
+  [new THREE.Vector3((i-1)*2.6,1.2,0.8),new THREE.Vector3((i-1)*0.8,2.1,-2.3)]);
+ const l=new THREE.Line(g,stringMat);room.add(l);strings.push(l);
+ document.getElementById('roomInfo').textContent='Unsealed '+NAMES[i][1]+' — click the desk.';
+}
+window.NA_ROOM_UNSEAL=unseal;
+let ry=0,drag=false,px=0;
+cv.addEventListener('pointerdown',e=>{drag=true;px=e.clientX});
+addEventListener('pointerup',()=>drag=false);
+cv.addEventListener('pointermove',e=>{if(drag){ry+=(e.clientX-px)*0.012;px=e.clientX}});
+const ray=new THREE.Raycaster(),mv=new THREE.Vector2();
+cv.addEventListener('click',e=>{
+ const r=cv.getBoundingClientRect();
+ mv.x=((e.clientX-r.left)/r.width)*2-1;mv.y=-((e.clientY-r.top)/r.height)*2+1;
+ ray.setFromCamera(mv,cam);
+ const hit=ray.intersectObjects(desks)[0];
+ if(hit)document.getElementById('roomInfo').textContent='🔎 '+BIOS[hit.object.userData.i];
+});
+function fit(){const w=cv.clientWidth||400,h=170;renderer.setSize(w,h,false);cam.aspect=w/h;cam.updateProjectionMatrix()}
+addEventListener('resize',fit);fit();
+(function loop(){ry+=drag?0:0.003;room.rotation.y=ry;renderer.render(scene,cam);requestAnimationFrame(loop)})();
+})();
+</script>
+</body>
+</html>
