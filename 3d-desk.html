@@ -1467,8 +1467,11 @@
 
     const npcRay = new THREE.Raycaster();
     const npcPtr = new THREE.Vector2();
-    renderer.domElement.addEventListener("click", event => {
+    // NOTE: listener lives on window, not the canvas — the .app overlay
+    // covers the fullscreen canvas, so canvas-bound clicks never fire.
+    window.addEventListener("click", event => {
       if (room !== "campus") return;
+      if (event.target.closest("button,textarea,input,a,select,.modal-veil,.topbar")) return;
       npcPtr.set(
         (event.clientX / window.innerWidth) * 2 - 1,
         -(event.clientY / window.innerHeight) * 2 + 1
