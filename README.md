@@ -6,7 +6,7 @@ Static prototype for the **NULL ALIBI** title-defense pitch
 ## Run
 
 - **Offline:** open `prototype-alibi.html` straight from disk.
-- **Live:** _(Vercel URL slot — paste after dashboard import)_
+- **Live:** https://null-alibi-kloudexa.vercel.app
 
 ## What's inside
 
