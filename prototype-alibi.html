@@ -43,7 +43,7 @@ textarea{width:100%;min-height:96px;background:#0c0b09;color:var(--green);border
 <div class="tabs"><button id="bCase">Case 01: Playable</button><button id="bBuild" class="ghost">Teacher builder</button><button id="bAcc" class="ghost">Accusation Mode</button></div>
 <main>
 <section class="card"><h3>Dossier</h3><div style="font-family:system-ui;font-size:14px"><b>Case 01 — The Missing Exhibit</b><br>NUB Research Lab. A capstone exhibit vanished 21:40. Three suspects, one access log, zero alibis.<br><br>Victim table: <code>exhibits</code> • People: <code>students</code> • Trail: <code>access_logs</code></div>
-<div class="tl" id="timeline"><div>✔ Briefing unlocked</div><div id="t1" class="locked">○ List all exhibits</div><div id="t2" class="locked">○ Filter Lab exhibits</div><div id="t3" class="locked">○ JOIN the night log</div></div>
+<div class="tl" id="timeline"><div>✔ Briefing unlocked</div><div id="t1" class="locked">○ List all exhibits</div><div id="t2" class="locked">○ Filter Lab exhibits</div><div id="t3" class="locked">○ JOIN the night log</div><div id="t4" class="locked">○ Name the intruder</div></div>
 <div class="note" style="margin-top:8px">Cases 02–03 stubbed for scope. QR handoff: <code id="saveCode">NUB-0000</code> <button class="ghost" id="qrBtn" style="padding:4px 8px">New code</button></div>
 <details style="margin-top:8px;font-family:system-ui;font-size:13px"><summary style="cursor:pointer;color:var(--green)">Schema + table previews</summary><div id="schemaBox" class="note" style="margin-top:6px"></div><div class="chips" id="prevRow"></div></details></section>
 <section><div class="card"><h3>Evidence wall</h3><div id="board"><div class="pin" id="p0" style="left:10px;top:10px">📌 Exhibit<br>Capstone rig<br>Last seen Lab</div></div><div class="note">3D evidence room below — drag to orbit, click a desk to inspect. Textures are primitives; campus block stays boxes-only.</div><div class="threebox"><canvas id="wall3d" width="400" height="170" style="width:100%;touch-action:none"></canvas><div id="roomInfo" class="note">Room: 3 sealed desks. Solve missions to unseal.</div></div></div>
@@ -86,14 +86,15 @@ renderGrid(r);
 if(r.mission==="M1"&&!solved[0]){unlock(0,r.count+' exhibits returned — rig, poster, drone, journal. Real rows above.')}
 else if(r.mission==="M2"&&solved[0]&&!solved[1]){unlock(1,r.count+' Lab exhibits — rig + drone. Filtered live.')}
 else if(r.mission==="M3"&&solved[1]&&!solved[2]){unlock(2,'Night log JOIN — badge W at 21:38, door forced 21:40. Joined '+r.count+' rows.')}
-else if(solved[2]){o.innerHTML+='<br>Already solved — go accuse.'}
+else if(/FROM\s+STUDENTS/i.test(q)&&/EXHIBITOR/i.test(q)&&r.count>0&&solved[2]&&!solved[3]){unlock(3,'Prime suspect: WILL — exhibitor holding badge W. Accusation unlocked.')}
+else if(solved[3]){o.innerHTML+='<br>Case closed — verdict stands.'}
 else{o.innerHTML+='<br><span class="note">Valid query, '+r.count+' rows — but not the mission. Hint: '+hint()+'</span>'}}
 function renderGrid(r){
 const o=document.getElementById('out');
 if(!r.count){o.innerHTML='✔ Ran clean — 0 rows. Loosen the WHERE.';return}
 let h='<div style="overflow:auto"><table style="border-collapse:collapse;font-size:12px"><tr>'+r.cols.map(c=>'<th style="border:1px solid #4a4438;padding:4px 8px;color:var(--green)">'+c+'</th>').join('')+'</tr>';
-r.rows.slice(0,12).forEach(row=>{h+='<tr>'+row.map(v=>'<td style="border:1px solid #333;padding:4px 8px">'+v+'</td>').join('')+'</tr>'});
-h+='</table></div><div class="note">'+r.count+' row(s). Missions unlock on the right result set, not the right string.</div>';
+r.rows.slice(0,12).forEach(row=>{h+='<tr>'+row.map((v,ci)=>{const cn=r.cols[ci]||'';const mask=corrupt>=50&&/suspect|name/i.test(cn);return '<td style="border:1px solid #333;padding:4px 8px">'+(mask?'██████':v)+'</td>'}).join('')+'</tr>'});
+h+='</table></div><div class="note">'+r.count+' row(s). Missions unlock on the right result set, not the right string.'+(corrupt>=50?'<br>⚠ Trace ≥50% — names redacted by MES. Restore backup to clear.':'')+'</div>';
 o.innerHTML=h}
 // schema browser + previews (final-look workstation dressing)
 (function(){try{
@@ -102,16 +103,23 @@ box.innerHTML=Object.keys(s).map(t=>'<div><code>'+t+'</code> ('+s[t].join(', ')+
 const pr=document.getElementById('prevRow');
 Object.keys(s).forEach(t=>{const b=document.createElement('button');b.textContent=t;b.onclick=()=>{document.getElementById('q').value='SELECT * FROM '+t;run()};pr.appendChild(b)});
 }catch(e){}})();
-function hint(){if(!solved[0])return"Try: SELECT * FROM exhibits";if(!solved[1])return"Add: WHERE location = 'Lab'";return"Try: SELECT * FROM exhibits JOIN access_logs ON …"}
+function hint(){if(!solved[0])return"Try: SELECT * FROM exhibits";if(!solved[1])return"Add: WHERE location = 'Lab'";if(!solved[2])return"Try: SELECT * FROM exhibits JOIN access_logs ON …";return"Try: SELECT name FROM students WHERE role = 'exhibitor'"}
 function unlock(i,msg){
-solved[i]=true;document.getElementById('out').textContent='✔ '+msg;
+solved[i]=true;document.getElementById('out').innerHTML+='<br>✔ '+msg;
+corrupt=Math.min(100,corrupt+8);document.getElementById('corr').style.width=corrupt+'%';document.getElementById('corrV').textContent=corrupt+'%';
+logAudit('TRACE','mission solve — trace +8% (MES notices digging)');
+if(corrupt>=100){document.getElementById('out').innerHTML+='<br>🔒 Trace 100% — locker sealed. Restore backup to continue.';logAudit('LOCK','trace maxed by solves')}
 if(window.NA_ROOM_UNSEAL)try{window.NA_ROOM_UNSEAL(i)}catch(e){}
 document.getElementById('t'+(i+1)).classList.remove('locked');document.getElementById('t'+(i+1)).textContent='✔ '+document.getElementById('t'+(i+1)).textContent.slice(2);
+if(i<3){
 const sw=document.getElementById('susps');if(i===0)sw.innerHTML='';
 const d=document.createElement('div');d.className='suspect';d.innerHTML=`<div class="face">${SUSP[i][0]}</div><div><b>${SUSP[i][1]}</b><br><span class="note">${SUSP[i][2]}</span></div>`;sw.appendChild(d);
 const b=document.getElementById('board');const p=document.createElement('div');p.className='pin';p.style.left=(160+i*60)+'px';p.style.top=(60+i*30)+'px';p.textContent='🔗 '+SUSP[i][1];b.appendChild(p);
 const s=document.createElement('div');s.className='string';s.style.left='70px';s.style.top='40px';s.style.width=(120+i*50)+'px';s.style.transform=`rotate(${15+i*10}deg)`;b.appendChild(s);
-if(i===2)document.getElementById('bAcc').style.borderColor='#7dffa8'}
+}else{
+document.getElementById('susps').innerHTML+='<div class="suspect"><div class="face">⚖</div><div><b>PRIME SUSPECT: WILL</b><br><span class="note">Exhibitor · badge W · 21:38</span></div></div>';
+}
+if(i>=2)document.getElementById('bAcc').style.borderColor='#7dffa8'}
 document.getElementById('run').onclick=run;
 document.getElementById('hint').onclick=()=>document.getElementById('out').textContent='Hint: '+hint();
 document.getElementById('clr').onclick=()=>document.getElementById('q').value='';
@@ -120,13 +128,13 @@ document.getElementById('qrBtn').onclick=()=>document.getElementById('saveCode')
 document.getElementById('bBuild').onclick=()=>{const b=document.getElementById('builder');b.style.display=b.style.display==='none'?'block':'none'};
 document.getElementById('bCase').onclick=()=>window.scrollTo(0,0);
 document.getElementById('bAcc').onclick=()=>{
-if(!solved[2])return alert('Solve 3 missions first');
+if(!solved[3])return alert('Solve 4 missions first');
 document.getElementById('accuse').classList.add('open');
 // Verdict scoring: S = 0.30E + 0.25Q + 0.20R + 0.15T + 0.10C (SYSTEMFLOWS §17)
-const E=Math.round(solved.filter(Boolean).length/3*100);
+const E=Math.round(solved.filter(Boolean).length/4*100);
 const Q=Math.max(40,100-wrong*5);
 const R=solved.every(Boolean)?100:40;
-const T=solved.every(Boolean)?100:Math.round(solved.filter(Boolean).length/3*100);
+const T=solved.every(Boolean)?100:Math.round(solved.filter(Boolean).length/4*100);
 const C=100; // prototype has one canonical culprit (Will, badge 21:38)
 const S=Math.round(0.30*E+0.25*Q+0.20*R+0.15*T+0.10*C);
 const v=document.getElementById('verdict');v.textContent='';

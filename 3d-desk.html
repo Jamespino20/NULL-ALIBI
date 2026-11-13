@@ -838,6 +838,13 @@
           "FROM access_logs a\n" +
           "JOIN suspects s ON a.suspect_id = s.id;",
         evidence: "Access log correlation"
+      },
+      {
+        title: "Name the intruder",
+        objective: "Query the suspects table to put a name to badge W.",
+        hint: "Try SELECT name FROM suspects WHERE id = 2.",
+        query: "SELECT name FROM suspects WHERE id = 2;",
+        evidence: "Verdict: Will"
       }
     ];
 
@@ -886,7 +893,9 @@
         const tr = document.createElement("tr");
         for (const header of headers) {
           const td = document.createElement("td");
-          td.textContent = String(row[header]);
+          const mask =
+            corruption >= 50 && /suspect|name/i.test(header);
+          td.textContent = mask ? "██████" : String(row[header]);
           tr.appendChild(td);
         }
         tbody.appendChild(tr);
@@ -1074,6 +1083,24 @@
         };
       }
 
+      if (currentMission === 3) {
+        const accepted =
+          /^select\s+name\s+from\s+suspects\s+where\s+id\s*=\s*2\s*;?$/i.test(sql);
+
+        if (!accepted) {
+          return {
+            ok: false,
+            message: "Name the badge holder: query suspects for id = 2."
+          };
+        }
+
+        return {
+          ok: true,
+          message: "Query accepted. Badge W belongs to Will. Case closed.",
+          rows: [{ name: "Will", role: "exhibitor" }]
+        };
+      }
+
       const joinMatch = sql.match(
         /^select\s+(.+?)\s+from\s+access_logs(?:\s+([a-z_]\w*))?\s+join\s+suspects(?:\s+([a-z_]\w*))?\s+on\s+([a-z_]\w*)\.suspect_id\s*=\s*([a-z_]\w*)\.id\s*;?$/i
       );
@@ -1125,6 +1152,16 @@
 
       setOutput(result.message, "success", result.rows);
 
+      // Every solved mission raises the trace: MES notices digging. +8% each.
+      corruption = Math.min(100, corruption + 8);
+      document.querySelector("#corruption-value").textContent = `${corruption}%`;
+      document.querySelector("#corruption-fill").style.width = `${corruption}%`;
+      if (corruption >= 100 && !lockerSealed) {
+        lockerSealed = true;
+        renderCorruption();
+        return;
+      }
+
       const evidence = missions[currentMission].evidence;
       if (!completedMissions.has(currentMission)) {
         completedMissions.add(currentMission);
@@ -1136,7 +1173,7 @@
 
       if (completedMissions.size === missions.length) {
         setOutput(
-          "Case 01 evidence assembled. The 21:38 lab entry conflicts with the witness timeline — Will was there.",
+          "Verdict: WILL — badge 21:38. Case 01 CLOSED.",
           "success",
           result.rows
         );
