@@ -471,6 +471,29 @@
       .panel { overflow: visible; }
       .terminal textarea { min-height: 120px; }
     }
+
+    /* Panels, rooms, steps, modals (defense-eve upgrade) */
+    .viewbar { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+    .viewbar button { min-height: 32px; padding: 5px 10px; font-size: 11px; border-radius: 7px; }
+    .viewbar .tog { opacity: .45; }
+    .viewbar .tog.on, .viewbar .room.on { opacity: 1; border-color: #d6ad6370; }
+    .layout > .gone { display: none; }
+    .dossier { order: 1; } .stage { order: 2; } .terminal { order: 3; }
+    .layout.swapped .stage { order: 3; } .layout.swapped .terminal { order: 2; }
+    .steps { display: grid; gap: 6px; margin: 10px 0 4px; }
+    .step { display: flex; gap: 8px; align-items: baseline; padding: 8px 10px;
+      border: 1px solid var(--line); border-radius: 8px; background: #ffffff06; font-size: 12px; }
+    .step.done { border-color: #9dbb9a55; color: var(--green); }
+    .step.now { border-color: #d6ad6370; background: #d6ad6312; }
+    .modal-veil { position: fixed; inset: 0; z-index: 40; display: none;
+      align-items: center; justify-content: center; background: #000a; padding: 16px; }
+    .modal-veil.open { display: flex; }
+    .modal { width: min(480px, 94vw); border: 1px solid #d6ad6355; border-radius: 14px;
+      background: #161e1d; padding: 20px; box-shadow: 0 20px 60px #000c; }
+    .modal h2 { margin: 0 0 6px; }
+    .modal .who { color: var(--accent); font-size: 11px; letter-spacing: .12em; text-transform: uppercase; }
+    .modal p.say { border-left: 2px solid var(--accent); padding-left: 10px; font-style: italic; }
+    .modal .row { display: flex; gap: 8px; margin-top: 14px; flex-wrap: wrap; }
   </style>
 </head>
 
@@ -488,7 +511,15 @@
       </div>
       <div class="case-status">
         CASE 01<br />
-        <span id="progress-label">0 / 3 missions complete</span>
+        <span id="progress-label">0 / 4 missions complete</span>
+      </div>
+      <div class="viewbar" role="toolbar" aria-label="Panels and rooms">
+        <button type="button" data-room="hideout" class="room on">Hideout</button>
+        <button type="button" data-room="campus" class="room">Campus</button>
+        <button type="button" data-panel="dossier" class="tog on">Dossier</button>
+        <button type="button" data-panel="stage" class="tog on">Wall</button>
+        <button type="button" data-panel="terminal" class="tog on">Terminal</button>
+        <button type="button" id="swap-panels" class="tog" title="Swap wall and terminal sides">⇄</button>
       </div>
     </header>
 
@@ -509,6 +540,7 @@
             <p class="eyebrow" id="mission-kicker">Mission 01</p>
             <h3 id="mission-title"></h3>
             <p class="muted" id="mission-objective"></p>
+             <div class="steps" id="step-list"></div>
           </div>
 
           <div class="row" style="display:flex;gap:7px;margin-top:9px">
@@ -591,6 +623,27 @@
     </main>
   </div>
 
+  <div class="modal-veil" id="talk-veil">
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="talk-name">
+      <div class="who" id="talk-role">PERSON OF INTEREST</div>
+      <h2 id="talk-name">—</h2>
+      <p class="say" id="talk-say">—</p>
+      <p class="muted" id="talk-note" style="font-size:12px"></p>
+      <div class="row">
+        <button class="primary" id="talk-accuse">Accuse</button>
+        <button class="secondary" id="talk-close">Let them go</button>
+      </div>
+    </div>
+  </div>
+  <div class="modal-veil" id="verdict-veil">
+    <div class="modal" role="dialog" aria-modal="true">
+      <div class="who">VERDICT</div>
+      <h2 id="verdict-title">Case 01 CLOSED</h2>
+      <p id="verdict-body"></p>
+      <div class="row"><button class="primary" id="verdict-close">File it</button></div>
+    </div>
+  </div>
+
   <script type="module">
     import * as THREE from "three";
 
@@ -616,7 +669,7 @@
     renderer.setClearColor(0x000000, 0);
 
     const scene = new THREE.Scene();
-    scene.fog = new THREE.Fog(0x151d1b, 14, 35);
+    scene.fog = new THREE.Fog(0x151d1b, 16, 85);
 
     const camera = new THREE.PerspectiveCamera(
       42,
@@ -817,36 +870,128 @@
     const missions = [
       {
         title: "Retrieve the exhibits",
-        objective: "Retrieve the lab exhibits to establish what was recorded.",
-        hint: "Start with SELECT * FROM exhibits.",
-        query: "SELECT * FROM exhibits;",
-        evidence: "Exhibit register"
+        evidence: "Exhibit register",
+        steps: [
+          {
+            label: "Pull the full register",
+            objective: "Retrieve every archived exhibit to establish what was recorded.",
+            hint: "Start with SELECT * FROM exhibits.",
+            query: "SELECT * FROM exhibits;",
+            test: s => /^select\s+\*\s+from\s+exhibits\s*;?$/i.test(s),
+            fail: "That query did not retrieve the full exhibit register.",
+            rows: [
+              { id: "EX-01", item: "Capstone rig", location: "LAB", recorded_at: "21:02" },
+              { id: "EX-02", item: "Exhibit poster", location: "HALL", recorded_at: "20:15" },
+              { id: "EX-03", item: "Survey drone", location: "LAB", recorded_at: "21:08" },
+              { id: "EX-04", item: "Field journal", location: "ARCHIVE", recorded_at: "19:44" }
+            ]
+          },
+          {
+            label: "Order by time",
+            objective: "Order the register by recorded time — timelines win cases.",
+            hint: "Add ORDER BY recorded_at.",
+            query: "SELECT * FROM exhibits ORDER BY recorded_at;",
+            test: s => /from\s+exhibits/i.test(s) && /order\s+by\s+recorded_at/i.test(s),
+            fail: "Sort the exhibits: ORDER BY recorded_at.",
+            rows: [
+              { id: "EX-04", item: "Field journal", location: "ARCHIVE", recorded_at: "19:44" },
+              { id: "EX-02", item: "Exhibit poster", location: "HALL", recorded_at: "20:15" },
+              { id: "EX-01", item: "Capstone rig", location: "LAB", recorded_at: "21:02" },
+              { id: "EX-03", item: "Survey drone", location: "LAB", recorded_at: "21:08" }
+            ]
+          }
+        ]
       },
       {
         title: "Find the lab entries",
-        objective: "Filter the exhibits to the records associated with the LAB.",
-        hint: "Use WHERE to filter exhibits by location = 'LAB'.",
-        query: "SELECT * FROM exhibits WHERE location = 'LAB';",
-        evidence: "Lab exhibits"
+        evidence: "Lab exhibits",
+        steps: [
+          {
+            label: "Filter the lab",
+            objective: "Filter the exhibits to the records associated with the LAB.",
+            hint: "Use WHERE to filter exhibits by location = 'LAB'.",
+            query: "SELECT * FROM exhibits WHERE location = 'LAB';",
+            test: s => /^select\s+\*\s+from\s+exhibits\s+where\s+location\s*=\s*['"]?lab['"]?\s*;?$/i.test(s),
+            fail: "Filter the exhibits by location = 'LAB'.",
+            rows: [
+              { id: "EX-01", item: "Capstone rig", location: "LAB", recorded_at: "21:02" },
+              { id: "EX-03", item: "Survey drone", location: "LAB", recorded_at: "21:08" }
+            ]
+          },
+          {
+            label: "Narrow the window",
+            objective: "Only one lab record came after 21:05. Isolate it.",
+            hint: "Add AND recorded_at > '21:05'.",
+            query: "SELECT * FROM exhibits WHERE location = 'LAB' AND recorded_at > '21:05';",
+            test: s => /from\s+exhibits/i.test(s) && /lab/i.test(s) && /recorded_at\s*>\s*['"]21:05['"]/i.test(s),
+            fail: "Narrow it: AND recorded_at > '21:05'.",
+            rows: [
+              { id: "EX-03", item: "Survey drone", location: "LAB", recorded_at: "21:08" }
+            ]
+          }
+        ]
       },
       {
         title: "Correlate access logs",
-        objective: "Join access_logs to suspects to connect the 21:38 lab entry with a person.",
-        hint: "Join access_logs and suspects on suspect_id = id.",
-        query:
-          "SELECT a.timestamp, s.name, a.location\n" +
-          "FROM access_logs a\n" +
-          "JOIN suspects s ON a.suspect_id = s.id;",
-        evidence: "Access log correlation"
+        evidence: "Access log correlation",
+        steps: [
+          {
+            label: "Join the log",
+            objective: "Join access_logs to suspects to connect entries with people.",
+            hint: "Join access_logs and suspects on suspect_id = id.",
+            query: "SELECT a.timestamp, s.name, a.location FROM access_logs a JOIN suspects s ON a.suspect_id = s.id;",
+            test: s => {
+              const jm = s.match(/^select\s+(.+?)\s+from\s+access_logs(?:\s+([a-z_]\w*))?\s+join\s+suspects(?:\s+([a-z_]\w*))?\s+on\s+([a-z_]\w*)\.suspect_id\s*=\s*([a-z_]\w*)\.id\s*;?$/i);
+              if (!jm) return false;
+              const [, columns, accessAlias, suspectAlias, leftAlias, rightAlias] = jm;
+              const accessName = accessAlias || "access_logs";
+              const suspectName = suspectAlias || "suspects";
+              const safeColumns = /^(?:\*|[a-z_]\w*(?:\.[a-z_]\w*)?(?:\s*,\s*[a-z_]\w*(?:\.[a-z_]\w*)?)*)$/i.test(columns);
+              return safeColumns && leftAlias.toLowerCase() === accessName.toLowerCase() && rightAlias.toLowerCase() === suspectName.toLowerCase();
+            },
+            fail: "The JOIN must connect access_logs.suspect_id to suspects.id.",
+            rows: [
+              { timestamp: "21:38", suspect: "Will", location: "LAB" },
+              { timestamp: "21:10", suspect: "Rain", location: "LAB" }
+            ]
+          },
+          {
+            label: "Pin the 21:38 entry",
+            objective: "One entry matters: the 21:38 lab access. Filter the join to it.",
+            hint: "Add WHERE timestamp = '21:38'.",
+            query: "SELECT a.timestamp, s.name FROM access_logs a JOIN suspects s ON a.suspect_id = s.id WHERE timestamp = '21:38';",
+            test: s => /join\s+suspects/i.test(s) && /suspect_id\s*=\s*\w+\.id/i.test(s) && /21:38/.test(s),
+            fail: "Keep the JOIN, then add WHERE timestamp = '21:38'.",
+            rows: [
+              { timestamp: "21:38", suspect: "Will", location: "LAB" }
+            ]
+          }
+        ]
       },
       {
         title: "Name the intruder",
-        objective: "Query the suspects table to put a name to badge W.",
-        hint: "Try SELECT name FROM suspects WHERE id = 2.",
-        query: "SELECT name FROM suspects WHERE id = 2;",
-        evidence: "Verdict: Will"
+        evidence: "Verdict: Will",
+        steps: [
+          {
+            label: "Query the suspects",
+            objective: "Put a name to badge W: query the suspects table.",
+            hint: "Try SELECT name FROM suspects WHERE id = 2.",
+            query: "SELECT name FROM suspects WHERE id = 2;",
+            test: s => /^select\s+name\s+from\s+suspects\s+where\s+id\s*=\s*2\s*;?$/i.test(s),
+            fail: "Name the badge holder: query suspects for id = 2.",
+            rows: [{ name: "Will", role: "exhibitor" }]
+          },
+          {
+            label: "Confront on campus",
+            kind: "action",
+            objective: "Go to Campus, talk to Will, and accuse with evidence.",
+            hint: "Top bar → Campus → click Will → Accuse.",
+            rows: []
+          }
+        ]
       }
     ];
+    let stepIndex = 0, misses = 0;
 
     const unlockedEvidence = [];
     const completedMissions = new Set();
@@ -988,15 +1133,39 @@
       if (index > 0 && !completedMissions.has(index - 1)) return;
 
       currentMission = index;
-      const mission = missions[index];
-
-      document.querySelector("#mission-kicker").textContent =
-        `Mission 0${index + 1}`;
-      document.querySelector("#mission-title").textContent = mission.title;
-      document.querySelector("#mission-objective").textContent = mission.objective;
-
-      queryInput.value = mission.query;
+      stepIndex = 0;
+      renderMissionHead();
+      queryInput.value = missions[index].steps[0].query || "";
       renderMissions();
+    }
+
+    function renderMissionHead() {
+      const mission = missions[currentMission];
+      const step = mission.steps[stepIndex];
+      document.querySelector("#mission-kicker").textContent =
+        `Mission 0${currentMission + 1} · step ${Math.min(stepIndex + 1, mission.steps.length)}/${mission.steps.length}`;
+      document.querySelector("#mission-title").textContent = mission.title;
+      document.querySelector("#mission-objective").textContent = step.objective;
+      renderSteps();
+    }
+
+    function renderSteps() {
+      const mission = missions[currentMission];
+      const box = document.querySelector("#step-list");
+      if (!box) return;
+      box.replaceChildren();
+      const doneMission = completedMissions.has(currentMission);
+      mission.steps.forEach((s, i) => {
+        const d = document.createElement("div");
+        const done = doneMission || i < stepIndex;
+        d.className = "step" + (done ? " done" : (i === stepIndex ? " now" : ""));
+        const mark = document.createElement("span");
+        mark.textContent = done ? "✓" : (i === stepIndex ? "→" : "○");
+        const lab = document.createElement("span");
+        lab.textContent = s.label + (s.kind === "action" ? " (on Campus)" : "");
+        d.append(mark, lab);
+        box.appendChild(d);
+      });
     }
 
     function safeEvaluate(query) {
@@ -1041,104 +1210,23 @@
         };
       }
 
-      if (currentMission === 0) {
-        const accepted = /^select\s+\*\s+from\s+exhibits\s*;?$/i.test(sql);
-        if (!accepted) {
-          return {
-            ok: false,
-            message: "That query did not retrieve the full exhibit register. Check the table and mission objective."
-          };
-        }
-
-        return {
-          ok: true,
-          message: "Query accepted. The exhibit register has been recovered.",
-          rows: [
-            { id: "EX-01", item: "Capstone rig", location: "LAB", recorded_at: "21:02" },
-            { id: "EX-02", item: "Exhibit poster", location: "HALL", recorded_at: "20:15" },
-            { id: "EX-03", item: "Survey drone", location: "LAB", recorded_at: "21:08" },
-            { id: "EX-04", item: "Field journal", location: "ARCHIVE", recorded_at: "19:44" }
-          ]
-        };
+      // Step engine: the current step of the current mission decides.
+      const mission = missions[currentMission];
+      const step = mission.steps[stepIndex];
+      if (!step) {
+        return { ok: false, message: "No open step — select a mission." };
       }
-
-      if (currentMission === 1) {
-        const accepted =
-          /^select\s+\*\s+from\s+exhibits\s+where\s+location\s*=\s*['"]?lab['"]?\s*;?$/i.test(sql);
-
-        if (!accepted) {
-          return {
-            ok: false,
-            message: "Filter the exhibits by location = 'LAB' to isolate the relevant record."
-          };
-        }
-
-        return {
-          ok: true,
-          message: "Query accepted. Two exhibits were associated with the lab.",
-          rows: [
-            { id: "EX-01", item: "Capstone rig", location: "LAB", recorded_at: "21:02" },
-            { id: "EX-03", item: "Survey drone", location: "LAB", recorded_at: "21:08" }
-          ]
-        };
-      }
-
-      if (currentMission === 3) {
-        const accepted =
-          /^select\s+name\s+from\s+suspects\s+where\s+id\s*=\s*2\s*;?$/i.test(sql);
-
-        if (!accepted) {
-          return {
-            ok: false,
-            message: "Name the badge holder: query suspects for id = 2."
-          };
-        }
-
-        return {
-          ok: true,
-          message: "Query accepted. Badge W belongs to Will. Case closed.",
-          rows: [{ name: "Will", role: "exhibitor" }]
-        };
-      }
-
-      const joinMatch = sql.match(
-        /^select\s+(.+?)\s+from\s+access_logs(?:\s+([a-z_]\w*))?\s+join\s+suspects(?:\s+([a-z_]\w*))?\s+on\s+([a-z_]\w*)\.suspect_id\s*=\s*([a-z_]\w*)\.id\s*;?$/i
-      );
-
-      if (!joinMatch) {
+      if (step.kind === "action") {
         return {
           ok: false,
-          message: "Join access_logs to suspects using suspect_id = id to identify the person behind the entry."
+          message: "This step happens off-terminal: " + step.objective
         };
       }
-
-      const [, columns, accessAlias, suspectAlias, leftAlias, rightAlias] = joinMatch;
-      const accessName = accessAlias || "access_logs";
-      const suspectName = suspectAlias || "suspects";
-
-      const safeColumns =
-        /^(?:\*|[a-z_]\w*(?:\.[a-z_]\w*)?(?:\s*,\s*[a-z_]\w*(?:\.[a-z_]\w*)?)*)$/i.test(columns);
-
-      if (
-        !safeColumns ||
-        leftAlias.toLowerCase() !== accessName.toLowerCase() ||
-        rightAlias.toLowerCase() !== suspectName.toLowerCase()
-      ) {
-        return {
-          ok: false,
-          message: "The JOIN must connect access_logs.suspect_id to suspects.id."
-        };
+      if (!step.test(sql)) {
+        misses++;
+        return { ok: false, message: step.fail + " Hint: " + step.hint };
       }
-
-      return {
-        ok: true,
-        message: "Query accepted. The 21:38 lab entry is now connected to a suspect.",
-        rows: [
-          { timestamp: "21:38", suspect: "Will", location: "LAB" },
-          { timestamp: "21:10", suspect: "Rain", location: "LAB" }
-        ]
-      };
-    }
+      return { ok: true, message: "Step accepted: " + step.label + ".", rows: step.rows };
 
     function runQuery() {
       if (lockerSealed) return;
@@ -1146,13 +1234,15 @@
       const result = safeEvaluate(queryInput.value);
 
       if (!result.ok) {
+        const onAction = missions[currentMission].steps[stepIndex].kind === "action";
+        if (!onAction && !/^(Unsafe|Evidence locker)/.test(result.message)) misses++;
         setOutput(result.message, "error");
         return;
       }
 
       setOutput(result.message, "success", result.rows);
 
-      // Every solved mission raises the trace: MES notices digging. +8% each.
+      // Every solved step raises the trace: MES notices digging. +8% each.
       corruption = Math.min(100, corruption + 8);
       document.querySelector("#corruption-value").textContent = `${corruption}%`;
       document.querySelector("#corruption-fill").style.width = `${corruption}%`;
@@ -1162,7 +1252,16 @@
         return;
       }
 
-      const evidence = missions[currentMission].evidence;
+      const mission = missions[currentMission];
+      if (stepIndex < mission.steps.length - 1) {
+        stepIndex++;
+        renderMissionHead();
+        const nx = mission.steps[stepIndex];
+        if (nx.query) queryInput.value = nx.query;
+        setOutput(result.message + ` Next — step ${stepIndex + 1}/${mission.steps.length}: ${nx.label}.`, "success", result.rows);
+        return;
+      }
+      const evidence = mission.evidence;
       if (!completedMissions.has(currentMission)) {
         completedMissions.add(currentMission);
         unlockedEvidence.push(evidence);
@@ -1170,25 +1269,18 @@
 
       renderMissions();
       renderEvidence();
-
-      if (completedMissions.size === missions.length) {
-        setOutput(
-          "Verdict: WILL — badge 21:38. Case 01 CLOSED.",
-          "success",
-          result.rows
-        );
-      }
+      renderMissionHead();
     }
 
     document.querySelector("#run-button").addEventListener("click", runQuery);
 
     document.querySelector("#example-button").addEventListener("click", () => {
-      queryInput.value = missions[currentMission].query;
+      queryInput.value = missions[currentMission].steps[stepIndex].query || "";
       queryInput.focus();
     });
 
     document.querySelector("#hint-button").addEventListener("click", () => {
-      setOutput(missions[currentMission].hint, "normal");
+      setOutput(missions[currentMission].steps[stepIndex].hint, "normal");
     });
 
     restoreButton.addEventListener("click", () => {
@@ -1219,6 +1311,172 @@
     renderEvidence();
     renderCorruption();
     selectMission(0);
+
+    // -------------------------------------------------------------------------
+    // Panels, rooms, NPC dialogue, verdict
+    // -------------------------------------------------------------------------
+    document.querySelectorAll("[data-panel]").forEach(b => b.addEventListener("click", () => {
+      const p = document.querySelector("." + b.dataset.panel);
+      if (!p) return;
+      p.classList.toggle("gone");
+      b.classList.toggle("on", !p.classList.contains("gone"));
+    }));
+    document.querySelector("#swap-panels").addEventListener("click", e => {
+      document.querySelector(".layout").classList.toggle("swapped");
+      e.currentTarget.classList.toggle("on");
+    });
+
+    let room = "hideout";
+    function setRoom(r) {
+      room = r;
+      document.querySelectorAll("[data-room]").forEach(x => x.classList.toggle("on", x.dataset.room === r));
+      if (r === "campus") {
+        camera.position.set(34, 6.5, 47);
+        camera.lookAt(34, 1.2, 33);
+      } else {
+        camera.position.set(0, 5.8, 14);
+        camera.lookAt(0, 2.7, -0.4);
+      }
+    }
+    document.querySelectorAll("[data-room]").forEach(b => b.addEventListener("click", () => setRoom(b.dataset.room)));
+
+    function nameSprite(text, color = "#d6ad63") {
+      const c = document.createElement("canvas");
+      c.width = 256; c.height = 72;
+      const x = c.getContext("2d");
+      x.fillStyle = "#111718ee";
+      x.fillRect(0, 0, 256, 72);
+      x.strokeStyle = color; x.lineWidth = 4; x.strokeRect(3, 3, 250, 66);
+      x.fillStyle = "#f2ede0"; x.font = "bold 34px monospace";
+      x.textAlign = "center"; x.textBaseline = "middle";
+      x.fillText(text, 128, 38);
+      const tex = new THREE.CanvasTexture(c);
+      tex.colorSpace = THREE.SRGBColorSpace;
+      const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true }));
+      sp.scale.set(1.7, 0.48, 1);
+      return sp;
+    }
+
+    // Campus extension: same scene, +34x offset. Fog widened so both read.
+    const campus = new THREE.Group();
+    scene.add(campus);
+    const CX = 34;
+    const ground = new THREE.Mesh(
+      new THREE.PlaneGeometry(34, 30),
+      mat("#1d2422")
+    );
+    ground.rotation.x = -Math.PI / 2;
+    ground.position.set(CX, -0.02, 34);
+    ground.receiveShadow = true;
+    campus.add(ground);
+    function building(w, h, d, x, z, color, label) {
+      addBox(campus, [w, h, d], [x, h / 2, z], mat(color));
+      const plate = new THREE.Mesh(
+        new THREE.PlaneGeometry(Math.min(w * 0.7, 4.4), 0.8),
+        new THREE.MeshBasicMaterial({
+          map: makeCardTexture(label, "NU BALIWAG", "#e8dfc2"),
+          side: THREE.DoubleSide
+        })
+      );
+      plate.position.set(x, h * 0.72, z + d / 2 + 0.06);
+      campus.add(plate);
+    }
+    building(7, 4.2, 5, CX - 7, 29, "#3a4a44", "LIBRARY");
+    building(8, 5, 5.5, CX + 7.5, 30, "#4a4438", "ENGINEERING");
+    building(3.4, 2.6, 3, CX, 41, "#39424a", "GATEHOUSE");
+
+    const NPCS = [
+      { id: 1, name: "Rain", color: "#92aa8b",
+        say: "Me? Shelving returns in the library at 21:10 — the access log backs me. Ask it, not me." },
+      { id: 2, name: "Will", color: "#d6ad63",
+        say: "Prints. I was running prints at 21:35, then… I stepped into the lab. Fine. But I didn't take anything." },
+      { id: 3, name: "Jhade", color: "#8a94a6",
+        say: "Gate log's got a gap, I know. Radio died 21:30–50. My round, my fault — but no exhibit." }
+    ];
+    const npcMeshes = [];
+    NPCS.forEach((n, i) => {
+      const x = CX + (i - 1) * 3.4, z = 34.5;
+      const bodyM = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.32, 0.42, 1.3, 12),
+        mat(n.color)
+      );
+      bodyM.position.set(x, 0.65, z);
+      bodyM.castShadow = true;
+      bodyM.userData.npc = n.id;
+      campus.add(bodyM);
+      npcMeshes.push(bodyM);
+      const hd = new THREE.Mesh(
+        new THREE.SphereGeometry(0.3, 14, 10),
+        mat("#e8c39a")
+      );
+      hd.position.set(x, 1.6, z);
+      hd.castShadow = true;
+      hd.userData.npc = n.id;
+      campus.add(hd);
+      npcMeshes.push(hd);
+      const tag = nameSprite(n.name.toUpperCase());
+      tag.position.set(x, 2.35, z);
+      campus.add(tag);
+    });
+
+    let talkId = 0;
+    const talkVeil = document.querySelector("#talk-veil");
+    function openTalk(id) {
+      talkId = id;
+      const n = NPCS.find(v => v.id === id);
+      document.querySelector("#talk-name").textContent = n.name;
+      document.querySelector("#talk-say").textContent = "\u201C" + n.say + "\u201D";
+      document.querySelector("#talk-note").textContent =
+        (currentMission === 3 && stepIndex >= 1)
+          ? "Evidence ready — an accusation will stick."
+          : "No name yet — finish M4's query step before accusing.";
+      talkVeil.classList.add("open");
+    }
+    document.querySelector("#talk-close").addEventListener("click", () => talkVeil.classList.remove("open"));
+    talkVeil.addEventListener("click", e => { if (e.target === talkVeil) talkVeil.classList.remove("open"); });
+    document.querySelector("#talk-accuse").addEventListener("click", () => {
+      const named = completedMissions.has(3) || (currentMission === 3 && stepIndex >= 1);
+      if (!named) {
+        document.querySelector("#talk-note").textContent =
+          "You need a name first — query the suspects table (M4), then accuse.";
+        return;
+      }
+      if (talkId !== 2) {
+        corruption = Math.min(100, corruption + 10);
+        renderCorruption();
+        document.querySelector("#talk-note").textContent =
+          "The timeline contradicts you — badge W entered at 21:38. Wrong accusations feed the trace (+10%).";
+        return;
+      }
+      if (!completedMissions.has(3)) {
+        completedMissions.add(3);
+        if (!unlockedEvidence.includes("Verdict: Will")) unlockedEvidence.push("Verdict: Will");
+        currentMission = 3; stepIndex = 1;
+        renderMissions(); renderEvidence(); renderMissionHead();
+      }
+      const Q = Math.max(40, 100 - 5 * misses);
+      const S = Math.round(0.30 * 100 + 0.25 * Q + 0.20 * 100 + 0.15 * 100 + 0.10 * 100);
+      document.querySelector("#verdict-title").textContent = "Case 01 CLOSED — WILL";
+      document.querySelector("#verdict-body").textContent =
+        `Badge W entered the LAB at 21:38. Will held badge W. E:100 Q:${Q} R:100 T:100 C:100 ⇒ S=${S} (misses: ${misses}).`;
+      talkVeil.classList.remove("open");
+      document.querySelector("#verdict-veil").classList.add("open");
+    });
+    document.querySelector("#verdict-close").addEventListener("click", () =>
+      document.querySelector("#verdict-veil").classList.remove("open"));
+
+    const npcRay = new THREE.Raycaster();
+    const npcPtr = new THREE.Vector2();
+    renderer.domElement.addEventListener("click", event => {
+      if (room !== "campus") return;
+      npcPtr.set(
+        (event.clientX / window.innerWidth) * 2 - 1,
+        -(event.clientY / window.innerHeight) * 2 + 1
+      );
+      npcRay.setFromCamera(npcPtr, camera);
+      const hit = npcRay.intersectObjects(npcMeshes, false)[0];
+      if (hit) openTalk(hit.object.userData.npc);
+    });
 
     // -------------------------------------------------------------------------
     // Render and resize
