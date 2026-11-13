@@ -1,0 +1,1217 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>NULL ALIBI — Investigation 01</title>
+
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://cdn.jsdelivr.net/npm/three@0.164.1/build/three.module.js"
+      }
+    }
+  </script>
+
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #111718;
+      --panel: rgba(22, 30, 31, .94);
+      --panel-light: rgba(31, 41, 41, .95);
+      --line: #ffffff1b;
+      --text: #e8e6dc;
+      --muted: #a4aca6;
+      --accent: #d6ad63;
+      --green: #9dbb9a;
+      --red: #d57970;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-width: 320px;
+      min-height: 100vh;
+      overflow: hidden;
+      background:
+        radial-gradient(ellipse at 50% 28%, #34413a 0%, #1c2524 45%, #111718 100%);
+      color: var(--text);
+      font: 14px/1.45 system-ui, sans-serif;
+    }
+
+    canvas#scene {
+      position: fixed;
+      inset: 0;
+      z-index: 0;
+      display: block;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+    }
+
+    button, textarea { font: inherit; }
+
+    button {
+      min-height: 38px;
+      padding: 8px 12px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #34413b;
+      color: var(--text);
+      cursor: pointer;
+      transition: background .15s ease, border-color .15s ease;
+    }
+
+    button:hover:not(:disabled) {
+      background: #46564b;
+      border-color: #d6ad6370;
+    }
+
+    button:disabled {
+      cursor: not-allowed;
+      opacity: .4;
+    }
+
+    .app {
+      position: relative;
+      z-index: 1;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .topbar {
+      min-height: 68px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      padding: 12px 20px;
+      border-bottom: 1px solid var(--line);
+      background: #111718d9;
+      backdrop-filter: blur(12px);
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .brand-mark {
+      width: 38px;
+      height: 38px;
+      display: grid;
+      place-items: center;
+      border: 1px solid #d6ad6355;
+      border-radius: 10px;
+      color: var(--accent);
+      font: 700 20px Georgia, serif;
+    }
+
+    .brand strong {
+      display: block;
+      letter-spacing: .12em;
+      font-size: 13px;
+    }
+
+    .brand small, .case-status {
+      color: var(--muted);
+      font-size: 11px;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+    }
+
+    .case-status {
+      text-align: right;
+    }
+
+    .layout {
+      flex: 1;
+      min-height: 0;
+      display: grid;
+      grid-template-columns: 260px minmax(260px, 1fr) 390px;
+      gap: 12px;
+      padding: 12px;
+    }
+
+    .panel {
+      min-height: 0;
+      overflow: auto;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      background: var(--panel);
+      box-shadow: 0 12px 35px #0003;
+      backdrop-filter: blur(12px);
+    }
+
+    .panel-inner { padding: 16px; }
+
+    .eyebrow {
+      margin: 0 0 6px;
+      color: var(--accent);
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: .15em;
+      text-transform: uppercase;
+    }
+
+    h1, h2, h3, p { margin-top: 0; }
+
+    h1, h2, h3 {
+      font-family: Georgia, "Times New Roman", serif;
+      font-weight: 500;
+    }
+
+    h2 { margin-bottom: 8px; font-size: 21px; }
+    h3 { margin-bottom: 8px; font-size: 15px; }
+
+    .muted { color: var(--muted); }
+
+    .mission-list {
+      display: grid;
+      gap: 6px;
+      margin: 14px 0 18px;
+    }
+
+    .mission-button {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      text-align: left;
+      background: #ffffff08;
+    }
+
+    .mission-button.active {
+      border-color: #d6ad6370;
+      background: #d6ad6318;
+    }
+
+    .mission-button .state {
+      color: var(--muted);
+      font-size: 11px;
+    }
+
+    .objective {
+      padding: 12px;
+      border: 1px solid var(--line);
+      border-radius: 9px;
+      background: #ffffff06;
+    }
+
+    .objective p:last-child { margin-bottom: 0; }
+
+    .evidence-list {
+      display: grid;
+      gap: 7px;
+      margin-top: 10px;
+    }
+
+    .evidence-item {
+      padding: 9px 10px;
+      border-left: 2px solid var(--green);
+      border-radius: 0 6px 6px 0;
+      background: #9dbb9a12;
+      color: #d3dfd0;
+      font-size: 12px;
+    }
+
+    .evidence-item.locked {
+      border-left-color: #737b76;
+      background: #ffffff06;
+      color: var(--muted);
+    }
+
+    .corruption {
+      margin-top: 18px;
+      padding-top: 14px;
+      border-top: 1px solid var(--line);
+    }
+
+    .corruption-head {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 7px;
+      font-size: 12px;
+    }
+
+    .meter {
+      height: 7px;
+      overflow: hidden;
+      border-radius: 99px;
+      background: #ffffff17;
+    }
+
+    .meter-fill {
+      width: 0;
+      height: 100%;
+      background: var(--green);
+      transition: width .25s ease, background .25s ease;
+    }
+
+    .stage {
+      position: relative;
+      display: flex;
+      min-width: 0;
+      flex-direction: column;
+      justify-content: space-between;
+      padding: 18px;
+      pointer-events: none;
+    }
+
+    .stage-title {
+      max-width: 400px;
+      padding: 12px 14px;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      background: #111718b8;
+      text-shadow: 0 2px 8px #000;
+    }
+
+    .stage-title h1 {
+      margin: 0 0 4px;
+      font-size: clamp(22px, 3vw, 34px);
+    }
+
+    .stage-title p {
+      margin: 0;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .evidence-wall {
+      padding: 12px;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      background: #111718cc;
+      backdrop-filter: blur(8px);
+    }
+
+    .evidence-wall-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      margin-bottom: 9px;
+    }
+
+    .evidence-wall-head strong {
+      font: 16px Georgia, serif;
+    }
+
+    .evidence-wall-head span {
+      color: var(--muted);
+      font-size: 11px;
+    }
+
+    .evidence-chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 7px;
+    }
+
+    .chip {
+      padding: 6px 9px;
+      border: 1px solid #9dbb9a4c;
+      border-radius: 6px;
+      background: #9dbb9a12;
+      color: #d4dfd1;
+      font-size: 11px;
+    }
+
+    .chip.empty {
+      border-color: var(--line);
+      background: transparent;
+      color: var(--muted);
+    }
+
+    .stage > * { pointer-events: auto; }
+
+    .schema {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin: 10px 0 14px;
+    }
+
+    .schema button {
+      min-height: 30px;
+      padding: 5px 8px;
+      border-radius: 6px;
+      background: #ffffff08;
+      color: #cbd0c9;
+      font: 11px ui-monospace, SFMono-Regular, Menlo, monospace;
+    }
+
+    .schema button:hover { color: var(--accent); }
+
+    .query-label {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 7px;
+      color: var(--muted);
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: .08em;
+    }
+
+    textarea {
+      display: block;
+      width: 100%;
+      min-height: 150px;
+      padding: 13px;
+      resize: vertical;
+      border: 1px solid #d6ad6333;
+      border-radius: 8px;
+      outline: none;
+      background: #0d1214;
+      color: #dfe4dc;
+      font: 12px/1.6 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      tab-size: 2;
+    }
+
+    textarea:focus { border-color: #d6ad6380; }
+
+    .terminal-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 7px;
+      margin: 9px 0 12px;
+    }
+
+    .primary {
+      border-color: #d6ad6370;
+      background: #806638;
+      color: #fff8e7;
+    }
+
+    .secondary { background: #ffffff08; }
+
+    .restore {
+      border-color: #d5797080;
+      background: #6a3433;
+    }
+
+    .output {
+      min-height: 120px;
+      padding: 11px;
+      overflow: auto;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #0d1214;
+    }
+
+    .output-message {
+      margin: 0 0 8px;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .output-message.success { color: var(--green); }
+    .output-message.error { color: #e2958d; }
+
+    .result-table {
+      width: 100%;
+      border-collapse: collapse;
+      font: 10px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace;
+    }
+
+    .result-table th, .result-table td {
+      padding: 5px 6px;
+      border: 1px solid #ffffff18;
+      text-align: left;
+      overflow-wrap: anywhere;
+    }
+
+    .result-table th { color: var(--accent); }
+
+    .footer-note {
+      margin: 9px 0 0;
+      color: var(--muted);
+      font-size: 10px;
+    }
+
+    @media (max-width: 1050px) {
+      .layout {
+        grid-template-columns: minmax(220px, .8fr) minmax(280px, 1.2fr);
+        grid-template-rows: minmax(250px, auto) minmax(320px, auto);
+        overflow: auto;
+      }
+
+      .stage {
+        grid-column: 1 / -1;
+        grid-row: 2;
+        min-height: 300px;
+      }
+
+      .terminal { grid-column: 2; grid-row: 1; }
+      .dossier { grid-column: 1; grid-row: 1; }
+      .app { height: auto; min-height: 100vh; }
+      .layout { flex: none; }
+    }
+
+    @media (max-width: 650px) {
+      body { overflow: auto; }
+      .topbar { min-height: 60px; padding: 10px 12px; }
+      .case-status { font-size: 9px; }
+      .layout {
+        display: flex;
+        flex-direction: column;
+        padding: 9px;
+      }
+      .stage {
+        order: 0;
+        min-height: 280px;
+        padding: 10px;
+      }
+      .dossier { order: 1; }
+      .terminal { order: 2; }
+      .panel { overflow: visible; }
+      .terminal textarea { min-height: 120px; }
+    }
+  </style>
+</head>
+
+<body>
+  <canvas id="scene" aria-hidden="true"></canvas>
+
+  <div class="app">
+    <header class="topbar">
+      <div class="brand">
+        <div class="brand-mark">N</div>
+        <div>
+          <strong>NULL ALIBI</strong>
+          <small>NU BALIWAG · INVESTIGATION DESK</small>
+        </div>
+      </div>
+      <div class="case-status">
+        CASE 01<br />
+        <span id="progress-label">0 / 3 missions complete</span>
+      </div>
+    </header>
+
+    <main class="layout">
+      <aside class="panel dossier">
+        <div class="panel-inner">
+          <p class="eyebrow">Case dossier</p>
+          <h2>The Missing Exhibit</h2>
+          <p class="muted">
+            A capstone exhibit vanished from the NUB lab at 21:40.
+            Three persons of interest — Rain, Will, Jhade — one access log.
+          </p>
+
+          <h3>Investigation missions</h3>
+          <div class="mission-list" id="mission-list"></div>
+
+          <div class="objective">
+            <p class="eyebrow" id="mission-kicker">Mission 01</p>
+            <h3 id="mission-title"></h3>
+            <p class="muted" id="mission-objective"></p>
+          </div>
+
+          <div class="row" style="display:flex;gap:7px;margin-top:9px">
+            <button class="secondary" id="hint-button">Request hint</button>
+          </div>
+
+          <div style="margin-top:18px">
+            <p class="eyebrow">Unlocked evidence</p>
+            <div class="evidence-list" id="evidence-list"></div>
+          </div>
+
+          <div class="corruption">
+            <div class="corruption-head">
+              <span>System corruption</span>
+              <strong id="corruption-value">0%</strong>
+            </div>
+            <div class="meter">
+              <div class="meter-fill" id="corruption-fill"></div>
+            </div>
+            <p class="footer-note">
+              Unsafe operations are blocked, but they still affect the simulation.
+            </p>
+          </div>
+        </div>
+      </aside>
+
+      <section class="stage" aria-label="Investigation workstation">
+        <div class="stage-title">
+          <p class="eyebrow">Investigation room · 23:41</p>
+          <h1>Every record leaves a trace.</h1>
+          <p>Search the case database. Connect the evidence. Find the truth.</p>
+        </div>
+
+        <div class="evidence-wall">
+          <div class="evidence-wall-head">
+            <strong>Evidence wall</strong>
+            <span id="evidence-count">0 items pinned</span>
+          </div>
+          <div class="evidence-chips" id="evidence-chips"></div>
+        </div>
+      </section>
+
+      <section class="panel terminal">
+        <div class="panel-inner">
+          <p class="eyebrow">Read-only case terminal</p>
+          <h2>SQL Console</h2>
+          <p class="muted" style="font-size:12px">
+            Query the fictional case dataset to uncover evidence.
+          </p>
+
+          <h3>Available tables</h3>
+          <div class="schema">
+            <button type="button" data-insert="exhibits">exhibits</button>
+            <button type="button" data-insert="access_logs">access_logs</button>
+            <button type="button" data-insert="suspects">suspects</button>
+          </div>
+
+          <label class="query-label" for="query">
+            <span>Query editor</span>
+            <span>Ctrl / ⌘ + Enter to run</span>
+          </label>
+          <textarea id="query" spellcheck="false" aria-label="SQL query"></textarea>
+
+          <div class="terminal-actions">
+            <button class="primary" id="run-button">Run query</button>
+            <button class="secondary" id="example-button">Load example</button>
+            <button class="restore" id="restore-button" hidden>Restore backup</button>
+          </div>
+
+          <div class="output" id="output" aria-live="polite">
+            <p class="output-message">Terminal ready. Select a mission and inspect the case records.</p>
+          </div>
+
+          <p class="footer-note">
+            Prototype note: queries are pattern-checked against approved examples;
+            this is not a general-purpose SQL engine.
+          </p>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <script type="module">
+    import * as THREE from "three";
+
+    // -------------------------------------------------------------------------
+    // Three.js investigation desk
+    // -------------------------------------------------------------------------
+
+    const canvas = document.querySelector("#scene");
+    const renderer = new THREE.WebGLRenderer({
+      canvas,
+      alpha: true,
+      antialias: true,
+      powerPreference: "high-performance"
+    });
+
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.1;
+    renderer.setClearColor(0x000000, 0);
+
+    const scene = new THREE.Scene();
+    scene.fog = new THREE.Fog(0x151d1b, 14, 35);
+
+    const camera = new THREE.PerspectiveCamera(
+      42,
+      window.innerWidth / window.innerHeight,
+      0.1,
+      100
+    );
+    camera.position.set(0, 5.8, 14);
+    camera.lookAt(0, 2.7, -0.4);
+
+    scene.add(new THREE.HemisphereLight(0xc8d3c4, 0x151b19, 2.0));
+
+    const keyLight = new THREE.DirectionalLight(0xffdba3, 2.5);
+    keyLight.position.set(-5, 9, 6);
+    keyLight.castShadow = true;
+    keyLight.shadow.mapSize.set(1024, 1024);
+    scene.add(keyLight);
+
+    const lampLight = new THREE.PointLight(0xe0ae63, 35, 9, 2);
+    lampLight.position.set(-4.2, 3.1, 0.5);
+    scene.add(lampLight);
+
+    const mat = (color, roughness = 0.85, metalness = 0) =>
+      new THREE.MeshStandardMaterial({ color, roughness, metalness });
+
+    const materials = {
+      floor: mat("#202927"),
+      desk: mat("#604635"),
+      deskTop: mat("#76563e"),
+      dark: mat("#151a19"),
+      frame: mat("#573e31"),
+      board: mat("#26312d"),
+      paper: mat("#d3c7a8"),
+      amber: mat("#d6ad63"),
+      green: mat("#92aa8b"),
+      red: mat("#bb7065"),
+      metal: mat("#414947", 0.4, 0.45)
+    };
+
+    function addBox(parent, size, position, material, castShadow = true) {
+      const mesh = new THREE.Mesh(new THREE.BoxGeometry(...size), material);
+      mesh.position.set(...position);
+      mesh.castShadow = castShadow;
+      mesh.receiveShadow = true;
+      parent.add(mesh);
+      return mesh;
+    }
+
+    function addCylinder(parent, radiusTop, radiusBottom, height, position, material) {
+      const mesh = new THREE.Mesh(
+        new THREE.CylinderGeometry(radiusTop, radiusBottom, height, 16),
+        material
+      );
+      mesh.position.set(...position);
+      mesh.castShadow = true;
+      mesh.receiveShadow = true;
+      parent.add(mesh);
+      return mesh;
+    }
+
+    function makeCardTexture(title, detail, color = "#d3c7a8") {
+      const card = document.createElement("canvas");
+      card.width = 512;
+      card.height = 320;
+      const ctx = card.getContext("2d");
+
+      ctx.fillStyle = color;
+      ctx.fillRect(0, 0, card.width, card.height);
+      ctx.fillStyle = "#282b25";
+      ctx.font = "bold 34px Georgia";
+      ctx.fillText(title, 28, 70);
+      ctx.fillStyle = "#45473d";
+      ctx.font = "22px monospace";
+
+      const words = detail.split(" ");
+      let line = "";
+      let y = 125;
+
+      for (const word of words) {
+        const test = line + word + " ";
+        if (ctx.measureText(test).width > 445) {
+          ctx.fillText(line, 28, y);
+          line = word + " ";
+          y += 34;
+        } else {
+          line = test;
+        }
+      }
+      if (line) ctx.fillText(line, 28, y);
+
+      const texture = new THREE.CanvasTexture(card);
+      texture.colorSpace = THREE.SRGBColorSpace;
+      return texture;
+    }
+
+    function addPinnedCard(x, y, title, detail, color, rotation = 0) {
+      const card = new THREE.Mesh(
+        new THREE.PlaneGeometry(1.35, 0.84),
+        new THREE.MeshBasicMaterial({
+          map: makeCardTexture(title, detail, color),
+          side: THREE.DoubleSide
+        })
+      );
+      card.position.set(x, y, -2.68);
+      card.rotation.z = rotation;
+      scene.add(card);
+
+      const pin = new THREE.Mesh(
+        new THREE.SphereGeometry(0.055, 10, 8),
+        materials.red
+      );
+      pin.position.set(x, y + 0.32, -2.62);
+      scene.add(pin);
+    }
+
+    // Floor and room wall
+    addBox(scene, [22, 0.3, 20], [0, -0.15, 0], materials.floor, false);
+    addBox(scene, [22, 9, 0.3], [0, 4.2, -3.2], mat("#202725"), false);
+
+    // Evidence board
+    addBox(scene, [9.2, 4.0, 0.22], [0, 3.55, -2.85], materials.frame);
+    addBox(scene, [8.85, 3.65, 0.08], [0, 3.55, -2.69], materials.board, false);
+
+    addPinnedCard(-3.0, 4.25, "EXHIBIT 01", "Capstone rig last seen in LAB", "#d9c98e", -0.03);
+    addPinnedCard(-1.2, 2.85, "ACCESS LOG", "Badge W entered LAB at 21:38", "#c4cdb1", 0.025);
+    addPinnedCard(1.0, 4.25, "WITNESS NOTE", "Rain: Will was here at 21:35.", "#d6b4a2", 0.02);
+    addPinnedCard(3.0, 2.85, "TIMELINE", "Three accounts. One mismatch.", "#c4c9cf", -0.025);
+
+    // Desk surface and legs
+    addBox(scene, [10.5, 0.35, 5.0], [0, 1.05, 2.3], materials.deskTop);
+    for (const x of [-4.65, 4.65]) {
+      for (const z of [0.5, 4.1]) {
+        addBox(scene, [0.28, 1.0, 0.28], [x, 0.45, z], materials.desk);
+      }
+    }
+
+    // Monitor and screen
+    addBox(scene, [3.5, 2.0, 0.18], [0, 2.45, 0.65], materials.dark);
+    addBox(scene, [3.22, 1.72, 0.035], [0, 2.45, 0.76], mat("#26322f", 0.35), false);
+    addBox(scene, [0.18, 0.75, 0.18], [0, 1.45, 0.68], materials.metal);
+    addBox(scene, [1.3, 0.12, 0.65], [0, 1.1, 0.72], materials.metal);
+
+    // Keyboard
+    addBox(scene, [2.9, 0.09, 0.75], [0.2, 1.27, 2.15], materials.dark);
+    for (let row = 0; row < 3; row++) {
+      for (let col = 0; col < 10; col++) {
+        addBox(
+          scene,
+          [0.18, 0.025, 0.11],
+          [-1.05 + col * 0.27, 1.325, 1.9 + row * 0.2],
+          row === 0 && col === 0 ? materials.amber : materials.metal,
+          false
+        );
+      }
+    }
+
+    // Coffee mug
+    addCylinder(scene, 0.3, 0.25, 0.5, [-3.25, 1.47, 2.0], mat("#b7ad95"));
+    addCylinder(scene, 0.24, 0.24, 0.025, [-3.25, 1.73, 2.0], mat("#302820"));
+    const mugHandle = new THREE.Mesh(
+      new THREE.TorusGeometry(0.18, 0.045, 8, 16),
+      mat("#b7ad95")
+    );
+    mugHandle.position.set(-2.95, 1.48, 2.0);
+    mugHandle.rotation.y = Math.PI / 2;
+    scene.add(mugHandle);
+
+    // Lamp
+    addCylinder(scene, 0.36, 0.42, 0.12, [-4.0, 1.32, 0.8], materials.metal);
+    const lampStem = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.035, 0.05, 1.25, 10),
+      materials.metal
+    );
+    lampStem.position.set(-4.0, 1.95, 0.8);
+    lampStem.rotation.z = -0.18;
+    scene.add(lampStem);
+
+    const lampShade = new THREE.Mesh(
+      new THREE.ConeGeometry(0.55, 0.5, 16, 1, true),
+      mat("#b78b4d", 0.45, 0.15)
+    );
+    lampShade.position.set(-4.12, 2.62, 0.8);
+    lampShade.rotation.x = Math.PI;
+    scene.add(lampShade);
+
+    // Small status light
+    const statusLight = new THREE.Mesh(
+      new THREE.SphereGeometry(0.07, 12, 8),
+      new THREE.MeshBasicMaterial({ color: "#89b583" })
+    );
+    statusLight.position.set(1.47, 3.23, 0.79);
+    scene.add(statusLight);
+
+    // -------------------------------------------------------------------------
+    // Mission data and safe, pattern-based query evaluation
+    // -------------------------------------------------------------------------
+
+    const missions = [
+      {
+        title: "Retrieve the exhibits",
+        objective: "Retrieve the lab exhibits to establish what was recorded.",
+        hint: "Start with SELECT * FROM exhibits.",
+        query: "SELECT * FROM exhibits;",
+        evidence: "Exhibit register"
+      },
+      {
+        title: "Find the lab entries",
+        objective: "Filter the exhibits to the records associated with the LAB.",
+        hint: "Use WHERE to filter exhibits by location = 'LAB'.",
+        query: "SELECT * FROM exhibits WHERE location = 'LAB';",
+        evidence: "Lab exhibits"
+      },
+      {
+        title: "Correlate access logs",
+        objective: "Join access_logs to suspects to connect the 21:38 lab entry with a person.",
+        hint: "Join access_logs and suspects on suspect_id = id.",
+        query:
+          "SELECT a.timestamp, s.name, a.location\n" +
+          "FROM access_logs a\n" +
+          "JOIN suspects s ON a.suspect_id = s.id;",
+        evidence: "Access log correlation"
+      }
+    ];
+
+    const unlockedEvidence = [];
+    const completedMissions = new Set();
+    let currentMission = 0;
+    let corruption = 0;
+    let lockerSealed = false;
+
+    const queryInput = document.querySelector("#query");
+    const output = document.querySelector("#output");
+    const runButton = document.querySelector("#run-button");
+    const restoreButton = document.querySelector("#restore-button");
+
+    const missionList = document.querySelector("#mission-list");
+    const evidenceList = document.querySelector("#evidence-list");
+    const evidenceChips = document.querySelector("#evidence-chips");
+
+    function setOutput(message, type = "normal", rows = null) {
+      output.replaceChildren();
+
+      const p = document.createElement("p");
+      p.className = `output-message ${type}`;
+      p.textContent = message;
+      output.appendChild(p);
+
+      if (!rows?.length) return;
+
+      const table = document.createElement("table");
+      table.className = "result-table";
+
+      const headers = Object.keys(rows[0]);
+      const thead = document.createElement("thead");
+      const headRow = document.createElement("tr");
+
+      for (const header of headers) {
+        const th = document.createElement("th");
+        th.textContent = header;
+        headRow.appendChild(th);
+      }
+      thead.appendChild(headRow);
+      table.appendChild(thead);
+
+      const tbody = document.createElement("tbody");
+      for (const row of rows) {
+        const tr = document.createElement("tr");
+        for (const header of headers) {
+          const td = document.createElement("td");
+          td.textContent = String(row[header]);
+          tr.appendChild(td);
+        }
+        tbody.appendChild(tr);
+      }
+
+      table.appendChild(tbody);
+      output.appendChild(table);
+    }
+
+    function renderMissions() {
+      missionList.replaceChildren();
+
+      missions.forEach((mission, index) => {
+        const unlocked = index === 0 || completedMissions.has(index - 1);
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = `mission-button${index === currentMission ? " active" : ""}`;
+        button.disabled = !unlocked;
+
+        const label = document.createElement("span");
+        label.textContent = `M${index + 1} · ${mission.title}`;
+
+        const state = document.createElement("span");
+        state.className = "state";
+        state.textContent = completedMissions.has(index)
+          ? "✓"
+          : unlocked ? "OPEN" : "LOCKED";
+
+        button.append(label, state);
+
+        if (unlocked) {
+          button.addEventListener("click", () => selectMission(index));
+        }
+
+        missionList.appendChild(button);
+      });
+
+      document.querySelector("#progress-label").textContent =
+        `${completedMissions.size} / ${missions.length} missions complete`;
+    }
+
+    function renderEvidence() {
+      evidenceList.replaceChildren();
+      evidenceChips.replaceChildren();
+
+      missions.forEach(mission => {
+        const unlocked = unlockedEvidence.includes(mission.evidence);
+
+        const item = document.createElement("div");
+        item.className = `evidence-item${unlocked ? "" : " locked"}`;
+        item.textContent = unlocked ? mission.evidence : "Evidence not yet recovered";
+        evidenceList.appendChild(item);
+      });
+
+      if (unlockedEvidence.length) {
+        for (const evidence of unlockedEvidence) {
+          const chip = document.createElement("span");
+          chip.className = "chip";
+          chip.textContent = evidence;
+          evidenceChips.appendChild(chip);
+        }
+      } else {
+        const empty = document.createElement("span");
+        empty.className = "chip empty";
+        empty.textContent = "No evidence pinned yet";
+        evidenceChips.appendChild(empty);
+      }
+
+      document.querySelector("#evidence-count").textContent =
+        `${unlockedEvidence.length} item${unlockedEvidence.length === 1 ? "" : "s"} pinned`;
+    }
+
+    function renderCorruption() {
+      const value = document.querySelector("#corruption-value");
+      const fill = document.querySelector("#corruption-fill");
+
+      value.textContent = `${corruption}%`;
+      fill.style.width = `${corruption}%`;
+      fill.style.background = corruption >= 60 ? "var(--red)" : "var(--green)";
+
+      restoreButton.hidden = !lockerSealed;
+      runButton.disabled = lockerSealed;
+
+      if (lockerSealed) {
+        setOutput("Evidence locker sealed. Restore the backup to continue.", "error");
+      }
+    }
+
+    function selectMission(index) {
+      if (index > 0 && !completedMissions.has(index - 1)) return;
+
+      currentMission = index;
+      const mission = missions[index];
+
+      document.querySelector("#mission-kicker").textContent =
+        `Mission 0${index + 1}`;
+      document.querySelector("#mission-title").textContent = mission.title;
+      document.querySelector("#mission-objective").textContent = mission.objective;
+
+      queryInput.value = mission.query;
+      renderMissions();
+    }
+
+    function safeEvaluate(query) {
+      const sql = query.trim();
+
+      if (!sql) {
+        return { ok: false, message: "Enter a query before running the terminal." };
+      }
+
+      // This prototype does not execute SQL. Unsafe statements are only detected
+      // and recorded as a simulated game consequence.
+      if (/\b(insert|update|delete|drop|alter|truncate|create|attach|detach|pragma|vacuum|replace)\b/i.test(sql)) {
+        corruption = Math.min(100, corruption + 20);
+
+        if (corruption >= 100) {
+          lockerSealed = true;
+          renderCorruption();
+          return {
+            ok: false,
+            message: "Unsafe operation blocked. Corruption reached 100%; the evidence locker is sealed."
+          };
+        }
+
+        renderCorruption();
+        return {
+          ok: false,
+          message: `Unsafe operation blocked. Corruption increased to ${corruption}%.`
+        };
+      }
+
+      if (/--|\/\*|\*\//.test(sql) || (sql.match(/;/g) || []).length > 1) {
+        return {
+          ok: false,
+          message: "Comments and multi-statement queries are not supported in this terminal."
+        };
+      }
+
+      if (!/^select\b/i.test(sql)) {
+        return {
+          ok: false,
+          message: "This case terminal only accepts approved SELECT query patterns."
+        };
+      }
+
+      if (currentMission === 0) {
+        const accepted = /^select\s+\*\s+from\s+exhibits\s*;?$/i.test(sql);
+        if (!accepted) {
+          return {
+            ok: false,
+            message: "That query did not retrieve the full exhibit register. Check the table and mission objective."
+          };
+        }
+
+        return {
+          ok: true,
+          message: "Query accepted. The exhibit register has been recovered.",
+          rows: [
+            { id: "EX-01", item: "Capstone rig", location: "LAB", recorded_at: "21:02" },
+            { id: "EX-02", item: "Exhibit poster", location: "HALL", recorded_at: "20:15" },
+            { id: "EX-03", item: "Survey drone", location: "LAB", recorded_at: "21:08" },
+            { id: "EX-04", item: "Field journal", location: "ARCHIVE", recorded_at: "19:44" }
+          ]
+        };
+      }
+
+      if (currentMission === 1) {
+        const accepted =
+          /^select\s+\*\s+from\s+exhibits\s+where\s+location\s*=\s*['"]?lab['"]?\s*;?$/i.test(sql);
+
+        if (!accepted) {
+          return {
+            ok: false,
+            message: "Filter the exhibits by location = 'LAB' to isolate the relevant record."
+          };
+        }
+
+        return {
+          ok: true,
+          message: "Query accepted. Two exhibits were associated with the lab.",
+          rows: [
+            { id: "EX-01", item: "Capstone rig", location: "LAB", recorded_at: "21:02" },
+            { id: "EX-03", item: "Survey drone", location: "LAB", recorded_at: "21:08" }
+          ]
+        };
+      }
+
+      const joinMatch = sql.match(
+        /^select\s+(.+?)\s+from\s+access_logs(?:\s+([a-z_]\w*))?\s+join\s+suspects(?:\s+([a-z_]\w*))?\s+on\s+([a-z_]\w*)\.suspect_id\s*=\s*([a-z_]\w*)\.id\s*;?$/i
+      );
+
+      if (!joinMatch) {
+        return {
+          ok: false,
+          message: "Join access_logs to suspects using suspect_id = id to identify the person behind the entry."
+        };
+      }
+
+      const [, columns, accessAlias, suspectAlias, leftAlias, rightAlias] = joinMatch;
+      const accessName = accessAlias || "access_logs";
+      const suspectName = suspectAlias || "suspects";
+
+      const safeColumns =
+        /^(?:\*|[a-z_]\w*(?:\.[a-z_]\w*)?(?:\s*,\s*[a-z_]\w*(?:\.[a-z_]\w*)?)*)$/i.test(columns);
+
+      if (
+        !safeColumns ||
+        leftAlias.toLowerCase() !== accessName.toLowerCase() ||
+        rightAlias.toLowerCase() !== suspectName.toLowerCase()
+      ) {
+        return {
+          ok: false,
+          message: "The JOIN must connect access_logs.suspect_id to suspects.id."
+        };
+      }
+
+      return {
+        ok: true,
+        message: "Query accepted. The 21:38 lab entry is now connected to a suspect.",
+        rows: [
+          { timestamp: "21:38", suspect: "Will", location: "LAB" },
+          { timestamp: "21:10", suspect: "Rain", location: "LAB" }
+        ]
+      };
+    }
+
+    function runQuery() {
+      if (lockerSealed) return;
+
+      const result = safeEvaluate(queryInput.value);
+
+      if (!result.ok) {
+        setOutput(result.message, "error");
+        return;
+      }
+
+      setOutput(result.message, "success", result.rows);
+
+      const evidence = missions[currentMission].evidence;
+      if (!completedMissions.has(currentMission)) {
+        completedMissions.add(currentMission);
+        unlockedEvidence.push(evidence);
+      }
+
+      renderMissions();
+      renderEvidence();
+
+      if (completedMissions.size === missions.length) {
+        setOutput(
+          "Case 01 evidence assembled. The 21:38 lab entry conflicts with the witness timeline — Will was there.",
+          "success",
+          result.rows
+        );
+      }
+    }
+
+    document.querySelector("#run-button").addEventListener("click", runQuery);
+
+    document.querySelector("#example-button").addEventListener("click", () => {
+      queryInput.value = missions[currentMission].query;
+      queryInput.focus();
+    });
+
+    document.querySelector("#hint-button").addEventListener("click", () => {
+      setOutput(missions[currentMission].hint, "normal");
+    });
+
+    restoreButton.addEventListener("click", () => {
+      corruption = 0;
+      lockerSealed = false;
+      renderCorruption();
+      setOutput(
+        "Backup restored. Current mission progress is preserved; the evidence locker is open.",
+        "success"
+      );
+    });
+
+    queryInput.addEventListener("keydown", event => {
+      if ((event.ctrlKey || event.metaKey) && event.key === "Enter") {
+        runQuery();
+      }
+    });
+
+    document.querySelectorAll("[data-insert]").forEach(button => {
+      button.addEventListener("click", () => {
+        const table = button.dataset.insert;
+        queryInput.value += queryInput.value ? ` ${table}` : table;
+        queryInput.focus();
+      });
+    });
+
+    renderMissions();
+    renderEvidence();
+    renderCorruption();
+    selectMission(0);
+
+    // -------------------------------------------------------------------------
+    // Render and resize
+    // -------------------------------------------------------------------------
+
+    function resize() {
+      const width = window.innerWidth;
+      const height = window.innerHeight;
+
+      camera.aspect = width / height;
+      camera.updateProjectionMatrix();
+
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
+      renderer.setSize(width, height, false);
+    }
+
+    window.addEventListener("resize", resize);
+
+    const clock = new THREE.Clock();
+
+    function animate() {
+      const time = clock.getElapsedTime();
+      statusLight.material.color.setHSL(0.29 + Math.sin(time * 1.4) * 0.015, 0.35, 0.62);
+      lampLight.intensity = 34 + Math.sin(time * 1.1) * 1.5;
+
+      renderer.render(scene, camera);
+      requestAnimationFrame(animate);
+    }
+
+    animate();
+  </script>
+</body>
+</html>
