@@ -1223,10 +1223,10 @@
         };
       }
       if (!step.test(sql)) {
-        misses++;
         return { ok: false, message: step.fail + " Hint: " + step.hint };
       }
       return { ok: true, message: "Step accepted: " + step.label + ".", rows: step.rows };
+    }
 
     function runQuery() {
       if (lockerSealed) return;
